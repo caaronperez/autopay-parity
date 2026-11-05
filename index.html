@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>password please</title>
+<style>
+:root{--bg:#f4f6f9;--surface:#fff;--fg:#17202c;--line:#d7dde6;--accent:#0b4f9e;--on:#fff;--err:#9b2c1c}
+@media (prefers-color-scheme:dark){:root{--bg:#11161d;--surface:#19202a;--fg:#e8edf4;--line:#313b49;--accent:#7db4f5;--on:#11161d;--err:#f5a99c;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,"Segoe UI",sans-serif}
+form{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:24px;display:grid;gap:12px}
+h1{font-size:20px;margin:0}
+label{font-weight:600;font-size:14px}
+input{width:100%;min-height:44px;padding:8px 10px;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px}
+button{min-height:44px;font:inherit;font-weight:600;color:var(--on);background:var(--accent);border:0;border-radius:6px;cursor:pointer}
+button:disabled{opacity:.6;cursor:default}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#msg{margin:0;font-size:14px;color:var(--err);min-height:21px}
+#nope{position:fixed;inset:0;display:flex;flex-direction:column;background:#000;z-index:1}
+#nope[hidden]{display:none}
+#nope iframe{flex:1;width:100%;min-height:0;border:0;background:#000}
+#bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--surface);color:var(--fg);text-align:center}
+#bar p{margin:0;font-weight:600}
+#again{padding:8px 20px}
+</style></head><body>
+<form id="f"><h1>you need the password for this one</h1><label for="p">password</label><input id="p" type="password" autocomplete="off" autofocus required><button id="b">lets go</button><p id="msg"></p></form>
+<div id="nope" hidden><div id="frame" style="flex:1;display:flex;min-height:0"></div><div id="bar"><p id="nopeText" role="alert"></p><button type="button" id="again">try again</button></div></div>
+<script>
+const API='https://autopay-parity-access.caaronperez.workers.dev';
+const form=document.getElementById('f'),button=document.getElementById('b'),message=document.getElementById('msg'),input=document.getElementById('p');
+const nope=document.getElementById('nope'),frame=document.getElementById('frame'),again=document.getElementById('again');
+const showNope=(text,canRetry)=>{
+  const f=document.createElement('iframe');
+  f.src='https://markhjorth.github.io/nedry/';f.title='ah ah ah, you didnt say the magic word';f.allow='autoplay';f.referrerPolicy='no-referrer';f.setAttribute('sandbox','allow-scripts');
+  frame.replaceChildren(f);
+  document.getElementById('nopeText').textContent=text;
+  again.hidden=!canRetry;nope.hidden=false;if(canRetry)again.focus();
+};
+again.addEventListener('click',()=>{frame.replaceChildren();nope.hidden=true;input.focus()});
+const closeForm=(text)=>{message.textContent=text;input.disabled=true;button.disabled=true;button.textContent='lets go'};
+form.addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  button.disabled=true;button.textContent='checking…';message.textContent='';
+  try{
+    const r=await fetch(API+'/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:input.value})});
+    const b=await r.json();
+    if(r.ok){document.open();document.write(b.html);document.close();return}
+    if(b.error==='blocked'){closeForm('');return showNope('too many tries. Try again in about '+Math.ceil(b.retryAfter/3600)+' hours... or not 👀',false)}
+    if(b.error==='expired')return closeForm('this page expired, its gone');
+    input.value='';
+    showNope('wrong password, '+b.attemptsLeft+(b.attemptsLeft===1?' try':' tries')+' left',true);
+  }catch(_){
+    message.textContent="cant reach the server, check your connection and try again";
+  }
+  button.disabled=false;button.textContent='lets go';
+});
+</script></body></html>
